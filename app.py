@@ -73,29 +73,17 @@ fig3 = px.bar(f.groupby("workingday")["count"].mean().reset_index(),
               x="workingday", y="count", title="Working vs Non-working Mean Rentals")
 st.plotly_chart(fig3, use_container_width=True)
 
-# 4) Weather with 95% CI
-def mean_ci(x):
-    return pd.Series({
-        "mean": x.mean(),
-        "ci": 1.96 * stats.sem(x)
-    })
+# 4) Weather with 95% CI (robust)
+wx = (
+    f.groupby("weather")["count"]
+    .agg(mean="mean", n="size", std="std")
+    .reset_index()
+)
 
-wx = f.groupby("weather")["count"].apply(mean_ci).reset_index()
+# SEM and 95% CI
+wx["sem"] = wx["std"] / np.sqrt(wx["n"].clip(lower=1))
+wx["ci"] = 1.96 * wx["sem"]
+wx["ci"] = wx["ci"].fillna(0)  # küçük gruplarda NaN olursa sıfır yap
+
 fig4 = px.bar(wx, x="weather", y="mean", error_y="ci", title="Weather Effect (95% CI)")
 st.plotly_chart(fig4, use_container_width=True)
-
-# 5) Day period × Working day
-pivot = f.pivot_table(values="count", index="day_period", columns="workingday", aggfunc="mean").reset_index()
-pivot = pivot.rename(columns={0: "Non-working", 1: "Working"})
-fig5 = px.bar(pivot, x="day_period", y=["Non-working", "Working"],
-              barmode="group", title="Day Period vs Working Day")
-st.plotly_chart(fig5, use_container_width=True)
-
-st.subheader("Key Findings")
-st.write("""
-• Demand is highest during daytime/commute hours.  
-• 2012 shows higher overall rentals than 2011.  
-• Fall season performs best on average.  
-• Weather category 1 yields the highest demand.  
-• Registered users dominate total rentals.
-""")
